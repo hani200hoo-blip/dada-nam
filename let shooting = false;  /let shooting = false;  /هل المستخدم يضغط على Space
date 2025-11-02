@@ -1,0 +1,15 @@
+document.addEventListener('keydown', e => {
+    keys[e.key] = true;
+
+    if(e.key === ' ' && !shooting && player.weapon === 'Gun'){
+        shooting = true; // بدأ الضغط على المسافة
+    }
+});
+
+document.addEventListener('keyup', e => {
+    keys[e.key] = false;
+
+    if(e.key === ' ' && shooting){
+        shooting = false; // رفع الإصبع عن المسافة
+    }
+});
