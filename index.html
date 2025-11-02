@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الچتل والگرص - PWA</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png">
+<style>
+body, html { margin:0; padding:0; overflow:hidden; font-family:Arial, sans-serif; background:#000; }
+#gameCanvas { display:block; margin:0 auto; background: url('https://images.unsplash.com/photo-1588615689306-b5d5c975ea9b?auto=format&fit=crop&w=1200&q=80') no-repeat center center; background-size:cover; border:2px solid #000; }
+#startBtn { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px 40px; font-size:24px; background-color:#ffcc00; border:none; border-radius:10px; cursor:pointer; z-index:1000; }
+#hud { position:absolute; top:10px; left:10px; font-size:18px; background: rgba(0,0,0,0.5); padding:5px 10px; border-radius:5px; color:#fff; }
+#loading { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:28px; color:#ffcc00; }
+</style>
+</head>
+<body>
+<div id="loading">تحميل اللعبة...</div>
+<button id="startBtn" style="display:none;">ابدأ اللعبة</button>
+<div id="hud">السلاح: None | الطاقة: 100</div>
+<canvas id="gameCanvas" width="900" height="500"></canvas>
+
+<script>
+// تسجيل Service Worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('service-worker.js').then(()=>{console.log('SW Registered');});
+}
+
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const hud=document.getElementById('hud');
+const startBtn=document.getElementById('startBtn');
+const loading=document.getElementById('loading');
+let gameStarted=false;
+
+// البطلة
+const player={x:100,y:400,width:50,height:50,color:'cyan',dy:0,speed:5,jumping:false,jumpPower:12,gravity:0.6,hp:100,weapon:'None',crouch:false};
+
+// الأعداء
+let enemies=[];
+function spawnEnemy(){
+  const y=400;
+  const types=['red','orange','purple','green'];
+  const color=types[Math.floor(Math.random()*types.length)];
+  const weapons=['Sword','Gun','Bow'];
+  const weapon=weapons[Math.floor(Math.random()*weapons.length)];
+  enemies.push({x:canvas.width+50,y,width:50,height:50,color,speed:2+Math.random()*2,weapon,alive:true,fall:false,fallDy:0});
+}
+
+// الحيوانات
+let animals=[];
+function spawnAnimal(){
+  const y=400;
+  animals.push({x:canvas.width+100,y,width:60,height:40,color:'brown',speed:1+Math.random()*1.5,hp:50,sound:'https://www.soundjay.com/animal/sounds/dog-barking-1.mp3'});
+}
+
+// الأسلحة
+let bullets=[];
+
+// الأصوات
+const shootSound=new Audio('https://www.soundjay.com/mechanical/sounds/pistol-1.mp3');
+const jumpSound=new Audio('https://www.soundjay.com/button/sounds/button-16.mp3');
+const swordSound=new Audio('https://www.soundjay.com/mechanical/sounds/sword-slash-1.mp3');
+const laughSound=new Audio('https://www.soundjay.com/human/sounds/laugh-1.mp3');
+
+// التحكم
+const keys={};
+document.addEventListener('keydown',e=>{keys[e.key]=true;});
+document.addEventListener('keyup',e=>{keys[e.key]=false;});
+document.addEventListener('keydown',e=>{
+  if(e.key===' ' && player.weapon==='Gun'){bullets.push({x:player.x+player.width,y:player.y+player.height/2-2,width:10,height:4,speed:7});shootSound.play();}
+  if(e.key==='ArrowUp' && !player.jumping){player.dy=-player.jumpPower;player.jumping=true;jumpSound.play();}
+  if(e.key==='ArrowDown') player.crouch=true;
+});
+document.addEventListener('keyup',e=>{if(e.key==='ArrowDown') player.crouch=false;});
+
+// HUD
+function updateHUD(){hud.innerHTML=`السلاح: ${player.weapon} | الطاقة: ${player.hp}`;}
+
+// تحميل وهمي
+setTimeout(()=>{loading.style.display='none'; startBtn.style.display='block';},1000);
+
+// تحديث اللعبة
+function update(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if(keys['ArrowRight']) player.x += keys['Shift']?player.speed*1.5:player.speed;
+  if(keys['ArrowLeft']) player.x -= keys['Shift']?player.speed*1.5:player.speed;
+
+  player.dy+=player.gravity;
+  player.y+=player.dy;
+  if(player.y>400){player.y=400;player.dy=0;player.jumping=false;}
+
+  const playerHeight=player.crouch?player.height/2:player.height;
+  ctx.fillStyle=player.color;
+  ctx.fillRect(player.x,player.y+player.height-playerHeight,player.width,playerHeight);
+
+  bullets.forEach((b,i)=>{
+    b.x+=b.speed;
+    ctx.fillStyle='yellow'; ctx.fillRect(b.x,b.y,b.width,b.height);
+    enemies.forEach((en,ei)=>{
+      if(en.alive && b.x<en.x+en.width && b.x+b.width>en.x && b.y<en.y+en.height && b.y+b.height>en.y){
+        player.weapon=en.weapon; en.alive=false; en.fall=true; bullets.splice(i,1); laughSound.play();
+      }
+    });
+    if(b.x>canvas.width) bullets.splice(i,1);
+  });
+
+  enemies.forEach((en,ei)=>{
+    if(en.alive) en.x-=en.speed; else if(en.fall){en.fallDy+=0.5; en.y+=en.fallDy; if(en.y>canvas.height) enemies.splice(ei,1);}
+    ctx.fillStyle=en.color; ctx.fillRect(en.x,en.y,en.width,en.height);
+    if(en.alive && player.x<en.x+en.width && player.x+player.width>en.x && player.y<en.y+en.height && player.y+player.height>en.y){player.hp-=1;}
+  });
+
+  animals.forEach((a,i)=>{
+    a.x-=a.speed; ctx.fillStyle=a.color; ctx.fillRect(a.x,a.y,a.width,a.height);
+    if(Math.random()<0.002){new Audio(a.sound).play();}
+    if(player.x<a.x+a.width && player.x+player.width>a.x && player.y<a.y+a.height && player.y+player.height>a.y){player.hp-=2;}
+    if(a.x<0) animals.splice(i,1);
+  });
+
+  if(Math.random()<0.02) spawnEnemy();
+  if(Math.random()<0.005) spawnAnimal();
+
+  updateHUD();
+  if(gameStarted) requestAnimationFrame(update);
+}
+
+// زر البداية
+startBtn.addEventListener('click',()=>{gameStarted=true;startBtn.style.display='none';update();});
+</script>
+</body>
+</html>
