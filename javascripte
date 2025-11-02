@@ -1,0 +1,96 @@
+// canvas و context
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// عناصر اللعبة
+let map = {width:2000, height:1000}; // خريطة كبيرة
+let camera = {x:0, y:0, width:canvas.width, height:canvas.height};
+
+let player = {
+    x:100, y:400, width:50, height:50, hp:100, weapon:'Gun', speed:5,
+    dy:0, jumping:false, gravity:0.6, crouch:false
+};
+
+let enemies = []; // أعداء على الخريطة
+let animals = []; // حيوانات
+let bullets = []; // الرصاص
+
+// توليد الأعداء على الخريطة
+function spawnEnemy(x, y){
+    let weapons = ['Gun','Sword'];
+    enemies.push({x, y, width:50, height:50, hp:50, weapon:weapons[Math.floor(Math.random()*weapons.length)]});
+}
+
+// توليد الحيوانات
+function spawnAnimal(x, y){
+    animals.push({x, y, width:60, height:40, hp:30});
+}
+
+// تحريك البطلة والكاميرا
+function updatePlayer(){
+    if(keys['ArrowRight']) player.x += player.speed;
+    if(keys['ArrowLeft']) player.x -= player.speed;
+    player.dy += player.gravity;
+    player.y += player.dy;
+    if(player.y>400){player.y=400;player.dy=0;player.jumping=false;}
+
+    // ضبط الكاميرا لتتبع اللاعب
+    camera.x = player.x - canvas.width/2;
+    camera.y = player.y - canvas.height/2;
+    if(camera.x<0) camera.x=0;
+    if(camera.y<0) camera.y=0;
+    if(camera.x+canvas.width>map.width) camera.x = map.width - canvas.width;
+    if(camera.y+canvas.height>map.height) camera.y = map.height - canvas.height;
+}
+
+// تحديث وإظهار الأعداء
+function updateEnemies(){
+    enemies.forEach((en,i)=>{
+        en.x -= 1; // حركة الأعداء تلقائية
+        // تصادم مع اللاعب
+        if(player.x < en.x+en.width && player.x+player.width > en.x &&
+           player.y < en.y+en.height && player.y+player.height > en.y){
+               player.hp -= 1;
+           }
+    });
+}
+
+// رسم الخريطة والعناصر
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // الخلفية
+    ctx.fillStyle='green';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // رسم اللاعب
+    ctx.fillStyle='cyan';
+    ctx.fillRect(player.x-camera.x, player.y-camera.y, player.width, player.height);
+
+    // رسم الأعداء
+    ctx.fillStyle='red';
+    enemies.forEach(en=>{
+        ctx.fillRect(en.x-camera.x, en.y-camera.y, en.width, en.height);
+    });
+
+    // رسم الحيوانات
+    ctx.fillStyle='brown';
+    animals.forEach(a=>{
+        ctx.fillRect(a.x-camera.x, a.y-camera.y, a.width, a.height);
+    });
+
+    // HUD
+    ctx.fillStyle='white';
+    ctx.font='18px Arial';
+    ctx.fillText(`HP: ${player.hp} | Weapon: ${player.weapon}`, 10, 20);
+}
+
+// اللعبة الأساسية
+function gameLoop(){
+    updatePlayer();
+    updateEnemies();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
