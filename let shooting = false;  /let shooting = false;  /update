@@ -1,0 +1,13 @@
+// إطلاق الرصاص المستمر
+if(shooting && player.weapon === 'Gun'){
+    if(frameCount % 5 === 0){ // للتحكم بسرعة الرصاص
+        bullets.push({
+            x: player.x + player.width,
+            y: player.y + player.height / 2 - 2,
+            width: 10,
+            height: 4,
+            speed: 7
+        });
+        shootSound.play();
+    }
+}
